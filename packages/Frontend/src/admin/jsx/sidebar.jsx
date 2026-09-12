@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { listTechnicians } from "../api/technicians";
 import "../css/sidebar.css";
 
 /**
@@ -10,19 +11,17 @@ import "../css/sidebar.css";
  * call would leave the session cookie valid — anyone could then type
  * /admin/dashboard back into the address bar and get straight back in,
  * because AdminProtectedRoute would still find an active session.
+ *
+ * The "Provider Approvals" badge used to be a hardcoded 3 — now it's the
+ * real pending count from GET /api/admin/technicians?status=pending.
  */
 
-const MENU_ITEMS = [
+const BASE_MENU_ITEMS = [
   { label: "Overview", icon: "🏠", path: "/admin/dashboard" },
   { label: "Bookings", icon: "📅", path: "/admin/bookings" },
   { label: "Technicians", icon: "🧑‍🔧", path: "/admin/technicians" },
   { label: "Customers", icon: "👤", path: "/admin/customers" },
-  {
-    label: "Provider Approvals",
-    icon: "➕",
-    path: "/admin/approvals",
-    badge: 3,
-  },
+  { label: "Provider Approvals", icon: "➕", path: "/admin/approvals" },
   { label: "Reports", icon: "📊", path: "/admin/reports" },
   { label: "Settings", icon: "⚙️", path: "/admin/settings" },
 ];
@@ -34,6 +33,19 @@ function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [pendingCount, setPendingCount] = useState(null);
+
+  useEffect(() => {
+    listTechnicians("pending")
+      .then((data) => setPendingCount(data.length))
+      .catch(() => setPendingCount(null));
+  }, []);
+
+  const menuItems = BASE_MENU_ITEMS.map((item) =>
+    item.path === "/admin/approvals" && pendingCount
+      ? { ...item, badge: pendingCount }
+      : item,
+  );
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -60,7 +72,7 @@ function Sidebar() {
       </div>
 
       <nav className="admin-sidebar__nav">
-        {MENU_ITEMS.map((item) => (
+        {menuItems.map((item) => (
           <Link
             key={item.label}
             to={item.path}

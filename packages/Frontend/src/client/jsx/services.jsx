@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../client/context/AuthContext.jsx";
 import { Link } from "react-router-dom";
 import Header from "../../component/jsx/header.jsx";
@@ -84,7 +85,12 @@ const CATEGORIES = [
 function Services() {
   const { isLoggedIn } = useAuth();
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].id);
-  const [searchValue, setSearchValue] = useState("");
+  const [searchParams] = useSearchParams();
+  // Pre-fill the search box if arriving from the home page's hero search
+  // (e.g. /services?search=fan) so the same filtering below picks it up.
+  const [searchValue, setSearchValue] = useState(
+    searchParams.get("search") || ""
+  );
 
   const handleChipClick = (id) => {
     setActiveCategory(id);
@@ -101,6 +107,24 @@ function Services() {
     }
     return `/checkout?category=${categoryId}&service=${encodeURIComponent(task.name)}`;
   };
+
+  // When the user is searching, only show categories that still have at
+  // least one matching task, and within each of those, only the tasks
+  // that actually match — everything else stays hidden. With an empty
+  // search box, every category/task shows as before.
+  const query = searchValue.trim().toLowerCase();
+  const isSearching = query.length > 0;
+
+  const visibleCategories = isSearching
+    ? CATEGORIES.map((cat) => ({
+        ...cat,
+        tasks: cat.tasks.filter((task) =>
+          task.name.toLowerCase().includes(query)
+        ),
+      })).filter((cat) => cat.tasks.length > 0)
+    : CATEGORIES;
+
+  const hasResults = visibleCategories.length > 0;
 
   return (
     <div className="services-page">
@@ -122,28 +146,36 @@ function Services() {
         </div>
       </div>
 
-      <div
-        className="category-chips"
-        role="tablist"
-        aria-label="Service categories"
-      >
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            role="tab"
-            aria-selected={activeCategory === cat.id}
-            className={`category-chip ${activeCategory === cat.id ? "is-active" : ""}`}
-            onClick={() => handleChipClick(cat.id)}
-          >
-            <span>{cat.icon}</span>
-            {cat.name.replace(" Services", "")}
-          </button>
-        ))}
-      </div>
+      {!isSearching && (
+        <div
+          className="category-chips"
+          role="tablist"
+          aria-label="Service categories"
+        >
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              role="tab"
+              aria-selected={activeCategory === cat.id}
+              className={`category-chip ${activeCategory === cat.id ? "is-active" : ""}`}
+              onClick={() => handleChipClick(cat.id)}
+            >
+              <span>{cat.icon}</span>
+              {cat.name.replace(" Services", "")}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isSearching && !hasResults && (
+        <div className="services-search__empty">
+          <p>No service found for &ldquo;{searchValue}&rdquo;.</p>
+        </div>
+      )}
 
       <div className="services-grid">
-        {CATEGORIES.map((cat) => (
+        {visibleCategories.map((cat) => (
           <section key={cat.id} id={cat.id} className="service-card">
             <header className="service-card__header">
               <span className="service-card__icon">{cat.icon}</span>
@@ -167,7 +199,7 @@ function Services() {
               ))}
             </div>
 
-            {cat.moreCount > 0 && (
+            {!isSearching && cat.moreCount > 0 && (
               <Link to={`/services/${cat.id}`} className="service-card__more">
                 +{cat.moreCount} more services
               </Link>

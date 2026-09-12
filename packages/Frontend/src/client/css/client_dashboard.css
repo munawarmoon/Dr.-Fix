@@ -474,18 +474,28 @@
   font-size: 14px;
 }
 
+.address-chip__default {
+  font-weight: 500;
+  color: var(--df-orange);
+  font-size: 12px;
+}
+
 .address-chip__detail {
   font-size: 12.5px;
   margin: 2px 0 0;
 }
 
 .address-chip__more {
-  margin-left: auto;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 12px;
   color: var(--df-body);
+  white-space: nowrap;
+}
+
+.address-chip__more:first-of-type {
+  margin-left: auto;
 }
 
 .add-address-btn {
@@ -499,6 +509,28 @@
   font-weight: 600;
   color: var(--df-orange);
   cursor: pointer;
+}
+
+.add-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-md);
+  padding: 14px;
+}
+
+.add-address-form input {
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm, 8px);
+  padding: 10px 12px;
+  font-family: var(--df-font-body);
+  font-size: 13.5px;
+}
+
+.add-address-form__actions {
+  display: flex;
+  gap: 10px;
 }
 
 /* ---------------- Referral ---------------- */
@@ -641,4 +673,11 @@
   .active-booking__row {
     grid-template-columns: 1fr;
   }
+}
+
+.empty-text {
+  color: var(--df-body, #666);
+  font-size: 13px;
+  text-align: center;
+  padding: 12px 0;
 }

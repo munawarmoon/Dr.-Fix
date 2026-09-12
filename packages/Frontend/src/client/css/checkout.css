@@ -153,6 +153,29 @@
   font-weight: 600;
 }
 
+.add-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-md);
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.add-address-form input {
+  border: 1px solid var(--df-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--df-font-body);
+  font-size: 13.5px;
+}
+
+.add-address-form__actions {
+  display: flex;
+  gap: 10px;
+}
+
 /* Date & time */
 .date-options {
   display: flex;
@@ -368,4 +391,14 @@
   .date-options {
     flex-wrap: wrap;
   }
+}
+
+.checkout-error {
+  color: #c0392b;
+  background: #fdecea;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-top: 8px;
+  text-align: center;
 }

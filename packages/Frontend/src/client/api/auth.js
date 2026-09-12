@@ -26,3 +26,6 @@ export const loginUser = (identifier, password) =>
 export const logoutUser = () => api.post("/logout");
 
 export const getCurrentUser = () => api.get("/me");
+
+export const updateProfile = ({ name, email, phone }) =>
+  api.put("/profile", { name, email, phone });

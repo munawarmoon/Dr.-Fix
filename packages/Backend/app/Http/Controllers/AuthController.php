@@ -5,12 +5,21 @@ namespace App\Http\Controllers;
 use App\Mail\OtpMail;
 use App\Models\Otp;
 use App\Models\User;
+use App\Services\JwtService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * AuthController
+ * --------------
+ * Customer register/login/OTP. Login now issues a JWT via JwtService
+ * (role = 'customer') instead of a Sanctum token, mirroring
+ * TechnicianAuthController's pattern — Sanctum is no longer used
+ * anywhere in this app after this change (see User model note).
+ */
 class AuthController extends Controller
 {
     
@@ -33,6 +42,7 @@ class AuthController extends Controller
         $user = User::create([
             'name'     => $request->name,
             'email'    => $request->email,
+            'phone'    => $request->phone,
             'password' => Hash::make($request->password),
         ]);
 
@@ -104,8 +114,8 @@ class AuthController extends Controller
             return response()->json(['message' => 'Please verify your email before logging in.'], 403);
         }
 
-      
-        $token = $user->createToken('auth_token')->plainTextToken;
+
+        $token = (new JwtService())->issueToken($user->id, 'customer');
 
         return response()->json([
             'message' => 'Login successful.',
@@ -114,23 +124,56 @@ class AuthController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
             ],
         ]);
     }
 
-    
+    /**
+     * JWTs are stateless — there's no server-side token to revoke, so
+     * this just confirms the request was authenticated (via jwt.auth)
+     * and tells the frontend it's fine to drop the token client-side.
+     * Same pattern as TechnicianAuthController::logout().
+     */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-
-        return response()->json(['message' => 'Logged out.']);
+        return response()->json(['message' => 'Logged out. Please remove the token client-side.']);
     }
 
     
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        return response()->json($request->attributes->get('customer'));
     }
+
+    /**
+     * PUT /api/profile
+     * Updates the same fields collected at signup (name, email, phone).
+     * Password changes are intentionally NOT handled here — that would
+     * need a separate current-password check, kept out of scope.
+     */
+    public function updateProfile(Request $request)
+    {
+        $customer = $request->attributes->get('customer');
+
+        $validator = Validator::make($request->all(), [
+            'name'  => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email,' . $customer->id,
+            'phone' => 'nullable|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $customer->update($request->only(['name', 'email', 'phone']));
+
+        return response()->json($customer->fresh());
+    }
+
 
     
     private function generateAndSendOtp(string $email): void

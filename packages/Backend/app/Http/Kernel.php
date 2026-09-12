@@ -67,5 +67,7 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         // Added for the simple session-based admin login.
         'admin.auth' => \App\Http\Middleware\EnsureAdmin::class,
+        // Added for technician auth (JWT instead of Sanctum).
+        'jwt.auth' => \App\Http\Middleware\JwtAuth::class,
     ];
 }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { registerUser } from "../api/auth";
+import { registerTechnician } from "../../technician/api/auth";
 import "../css/signup.css";
 import { Eye, EyeOff, Home, Wrench } from "lucide-react";
 /**
@@ -8,10 +9,16 @@ import { Eye, EyeOff, Home, Wrench } from "lucide-react";
  * ------
  * Two-step-in-one page:
  *  1. Role selection ("I Need a Service" vs "I Provide Services")
- *  2. Registration form (name, email, phone, password)
+ *  2. Registration form (name, email, phone, password [+ provider-only
+ *     fields: service category, experience, work area, NID upload])
  *
- * On successful submit, calls POST /api/register, then routes to /otp
- * carrying the email in router state so the Otp page knows who to verify.
+ * Customer (role="customer"): POST /api/register, then routes to /otp
+ * to verify the email, since that's the only identity check we have.
+ *
+ * Provider (role="provider"): POST /api/technician/register. No OTP —
+ * the NID upload + admin manual approval is the identity check instead.
+ * Routes straight to /technician/login; the account sits at
+ * approval_status="pending" until an admin approves/rejects it.
  */
 
 const ROLES = [
@@ -31,7 +38,10 @@ const ROLES = [
 
 function Signup() {
   const navigate = useNavigate();
-  const [role, setRole] = useState("customer");
+  const [searchParams] = useSearchParams();
+  const [role, setRole] = useState(
+    searchParams.get("role") === "provider" ? "provider" : "customer",
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -43,11 +53,20 @@ function Signup() {
     password: "",
     confirmPassword: "",
     agreed: false,
+    // Provider-only fields — ignored by the backend if role !== "provider"
+    serviceCategory: "",
+    yearsOfExperience: "",
+    workArea: "",
+    nidFile: null,
   });
 
   const updateField = (field) => (e) => {
     const value = field === "agreed" ? e.target.checked : e.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateFile = (field) => (e) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.files[0] || null }));
   };
 
   const handleSubmit = async (e) => {
@@ -61,9 +80,22 @@ function Signup() {
 
     setSubmitting(true);
     try {
+      if (role === "provider") {
+        await registerTechnician(form);
+        // No OTP step for providers — the account is created straight
+        // into approval_status = "pending". Send them to the review
+        // page; they'll need to log in there (or we could auto-login,
+        // but keeping it explicit is simpler and matches the login page
+        // already built for this role).
+        navigate("/technician/login", {
+          state: { justRegistered: true, email: form.email },
+        });
+        return;
+      }
+
       await registerUser({ role, ...form });
       // Backend has emailed the OTP by this point — move to the OTP screen.
-      navigate("/otp", { state: { email: form.email } });
+      navigate("/otp", { state: { email: form.email, role } });
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -193,6 +225,69 @@ function Signup() {
               </button>
             </div>
           </label>
+
+          {/* Provider-only fields — shown only when "I Provide Services"
+              is selected above. Customer flow is completely unaffected. */}
+          {role === "provider" && (
+            <div className="signup-form__provider-fields">
+              <p className="signup-form__section-label">Professional Details</p>
+
+              <div className="signup-form__grid">
+                <label className="signup-field">
+                  <span className="signup-field__label">Service Category</span>
+                  <select
+                    value={form.serviceCategory}
+                    onChange={updateField("serviceCategory")}
+                  >
+                    <option value="">Select a category</option>
+                    <option value="electric">Electric</option>
+                    <option value="plumbing">Plumbing</option>
+                    <option value="ac_repair">AC Repair</option>
+                    <option value="carpentry">Carpentry</option>
+                    <option value="painting">Painting</option>
+                    <option value="cleaning">Cleaning</option>
+                  </select>
+                </label>
+
+                <label className="signup-field">
+                  <span className="signup-field__label">
+                    Years of Experience
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 5"
+                    value={form.yearsOfExperience}
+                    onChange={updateField("yearsOfExperience")}
+                  />
+                </label>
+
+                <label className="signup-field">
+                  <span className="signup-field__label">Work Area</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dhanmondi, Dhaka"
+                    value={form.workArea}
+                    onChange={updateField("workArea")}
+                  />
+                </label>
+
+                <label className="signup-field">
+                  <span className="signup-field__label">NID / ID Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={updateFile("nidFile")}
+                  />
+                </label>
+              </div>
+
+              <p className="signup-form__note">
+                Your application will be reviewed within 24-48 hours after
+                signup.
+              </p>
+            </div>
+          )}
 
           <label className="signup-terms">
             <input

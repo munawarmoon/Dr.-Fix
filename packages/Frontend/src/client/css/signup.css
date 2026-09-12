@@ -255,3 +255,52 @@
     padding: 24px;
   }
 }
+
+/* ---------------- Provider-only fields (signup) ---------------- */
+.signup-form__provider-fields {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--df-border, #ececec);
+}
+
+.signup-form__section-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--df-orange, #ff5a1f);
+  margin: 0 0 14px;
+}
+
+.signup-form__provider-fields select {
+  width: 100%;
+  border: 1px solid var(--df-border, #ececec);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--df-heading, #1a1a1a);
+  background: #fff;
+  outline: none;
+}
+
+.signup-form__provider-fields select:focus {
+  border-color: var(--df-orange, #ff5a1f);
+}
+
+.signup-form__provider-fields input[type="file"] {
+  width: 100%;
+  border: 1px solid var(--df-border, #ececec);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--df-body, #4a4a4a);
+  background: #fff;
+}
+
+.signup-form__note {
+  font-size: 12.5px;
+  color: var(--df-body, #4a4a4a);
+  margin: 4px 0 0;
+}

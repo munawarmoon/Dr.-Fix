@@ -55,6 +55,13 @@
   color: #9a9a9a;
 }
 
+.services-search__empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--df-body);
+  font-size: 15px;
+}
+
 /* ---------------- Category chips ---------------- */
 .category-chips {
   position: sticky;

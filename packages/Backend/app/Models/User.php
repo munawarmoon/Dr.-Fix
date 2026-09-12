@@ -6,17 +6,29 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
+// Sanctum's HasApiTokens removed — customer auth now issues JWTs via
+// JwtService (see AuthController::login), same mechanism as technician
+// auth. Nothing in the app uses Sanctum tokens anymore. The composer
+// package/config (config/sanctum.php) are left installed in case you
+// want it back, but can be removed with `composer remove laravel/sanctum`.
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'email_verified_at',
+        // Provider fields — added for technician signup/JWT auth.
+        'role',
+        'service_category',
+        'years_of_experience',
+        'work_area',
+        'nid_path',
+        'approval_status',
     ];
 
     /**

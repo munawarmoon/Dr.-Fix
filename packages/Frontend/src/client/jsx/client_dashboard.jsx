@@ -1,28 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../../component/jsx/header.jsx";
+import { listMyBookings } from "../api/bookings";
+import { getCurrentUser } from "../api/auth";
+import {
+  listAddresses,
+  createAddress,
+  deleteAddress,
+  makeAddressDefault,
+} from "../api/addresses";
 import "../css/client_dashboard.css";
 
 
-const MOCK_USER = {
-  name: "Rahim",
-  membershipTier: "Silver",
-};
-
-
-const MOCK_ACTIVE_BOOKING = {
-  technicianName: "Arif M.",
-  technicianRole: "AC Specialist",
-  eta: "Arriving in 15 minutes",
-  vehicleNo: "DL 12 AB 1234",
-  steps: [
-    { label: "Booked", time: "10:30 AM", status: "done" },
-    { label: "Assigned", time: "10:32 AM", status: "done" },
-    { label: "On the way", time: "10:40 AM", status: "current" },
-    { label: "Completed", time: "", status: "upcoming" },
-  ],
-};
-
+// NOTE: MOCK_ACTIVE_BOOKING and MOCK_RECENT_SERVICES used to be hardcoded
+// here. Both sections below are now driven by GET /bookings (see
+// client/api/bookings.js) via the `bookings` state loaded in
+// ClientDashboard(). The greeting name and Saved Addresses are now real
+// too (GET /me and GET/POST/DELETE /addresses). Left as mock, on
+// purpose, per project decision: MOCK_PENDING_REVIEW, MOCK_MEMBERSHIP,
+// MOCK_WARRANTIES — rating/review and loyalty-tier features that are a
+// separate piece of work.
 
 const MOCK_PENDING_REVIEW = {
   serviceName: "AC repair",
@@ -35,31 +32,6 @@ const MOCK_MEMBERSHIP = {
   tiers: ["Bronze", "Silver", "Gold"],
   currentTier: "Silver",
 };
-
-// Empty array -> "no bookings yet" empty state.
-const MOCK_RECENT_SERVICES = [
-  {
-    id: 1,
-    name: "AC Repair",
-    date: "12 May 2025",
-    technician: "Arif M.",
-    status: "Completed",
-  },
-  {
-    id: 2,
-    name: "Plumbing Fix",
-    date: "02 May 2025",
-    technician: "Imran K.",
-    status: "Completed",
-  },
-  {
-    id: 3,
-    name: "Electrical Repair",
-    date: "22 Apr 2025",
-    technician: "Sajjad H.",
-    status: "Cancelled",
-  },
-];
 
 // Empty array -> warranty section hidden entirely.
 const MOCK_WARRANTIES = [
@@ -86,22 +58,124 @@ const MOCK_WARRANTIES = [
   },
 ];
 
-const MOCK_ADDRESSES = [
-  { id: 1, label: "Home", detail: "House 45, Road 12, Dhanmondi, Dhaka 1209" },
-  { id: 2, label: "Office", detail: "Level 5, House 12, Banani, Dhaka 1213" },
-];
-
 const REFERRAL_CODE = "RAHIM100";
 
 /* ---------------------------------------------------------------------- */
 
 function ClientDashboard() {
   const [rating, setRating] = useState(0);
+  const [bookings, setBookings] = useState([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  const [user, setUser] = useState(null);
+  const [addresses, setAddresses] = useState([]);
+  const [newAddress, setNewAddress] = useState({ label: "", detail: "" });
+  const [addingAddress, setAddingAddress] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
-  const hasActiveBooking = Boolean(MOCK_ACTIVE_BOOKING);
+  useEffect(() => {
+    listMyBookings()
+      .then(({ data }) => setBookings(data))
+      .catch(() => setBookings([]))
+      .finally(() => setLoadingBookings(false));
+
+    getCurrentUser()
+      .then(({ data }) => setUser(data))
+      .catch(() => setUser(null));
+
+    listAddresses()
+      .then(({ data }) => setAddresses(data))
+      .catch(() => setAddresses([]));
+  }, []);
+
+  const handleAddAddress = async (e) => {
+    e.preventDefault();
+    if (!newAddress.label.trim() || !newAddress.detail.trim()) return;
+
+    setAddingAddress(true);
+    try {
+      const { data } = await createAddress(newAddress);
+      setAddresses((prev) => [data, ...prev]);
+      setNewAddress({ label: "", detail: "" });
+      setShowAddForm(false);
+    } catch {
+      /* keep the form open so the user can retry */
+    } finally {
+      setAddingAddress(false);
+    }
+  };
+
+  const handleDeleteAddress = async (id) => {
+    setAddresses((prev) => prev.filter((a) => a.id !== id));
+    try {
+      await deleteAddress(id);
+    } catch {
+      // Re-sync on failure rather than leaving stale UI.
+      listAddresses()
+        .then(({ data }) => setAddresses(data))
+        .catch(() => {});
+    }
+  };
+
+  const handleMakeDefault = async (id) => {
+    try {
+      await makeAddressDefault(id);
+      const { data } = await listAddresses();
+      setAddresses(data);
+    } catch {
+      /* no-op — UI just won't reflect the change */
+    }
+  };
+
+  // "Active" = the most recent booking that isn't finished yet — any
+  // stage from "waiting for a technician" through "technician working
+  // on it right now" counts. Bookings are returned newest-first by the
+  // backend.
+  const activeBooking = bookings.find(
+    (b) => b.status !== "completed" && b.status !== "cancelled",
+  );
+
+  // Everything else (completed/cancelled) goes in "Recent Services".
+  const recentServices = bookings.filter(
+    (b) => b.status === "completed" || b.status === "cancelled",
+  );
+
+  const hasActiveBooking = Boolean(activeBooking);
   const hasPendingReview = Boolean(MOCK_PENDING_REVIEW);
-  const hasRecentServices = MOCK_RECENT_SERVICES.length > 0;
+  const hasRecentServices = recentServices.length > 0;
   const hasWarranties = MOCK_WARRANTIES.length > 0;
+
+  // Full 6-stage progress, matching TechnicianBookingController's stages
+  // (pending -> accepted -> on_the_way -> arrived -> in_progress -> completed).
+  const STAGE_ORDER = [
+    "pending",
+    "accepted",
+    "on_the_way",
+    "arrived",
+    "in_progress",
+    "completed",
+  ];
+  const activeStageIndex = activeBooking
+    ? STAGE_ORDER.indexOf(activeBooking.status)
+    : -1;
+
+  const activeBookingSteps = activeBooking
+    ? [
+        { label: "Booked" },
+        { label: "Assigned" },
+        { label: "On The Way" },
+        { label: "Arrived" },
+        { label: "Working" },
+        { label: "Completed" },
+      ].map((step, idx) => ({
+        ...step,
+        status:
+          idx < activeStageIndex
+            ? "done"
+            : idx === activeStageIndex
+              ? "current"
+              : "upcoming",
+      }))
+    : [];
 
   return (
     <div className="client-dashboard">
@@ -111,12 +185,10 @@ function ClientDashboard() {
         {/* ---------------- Greeting ---------------- */}
         <section className="greeting">
           <h1>
-            Hi {MOCK_USER.name},<br />
+            Hi {user?.name || "there"},<br />
             how can we help your home today?
           </h1>
-          <span className="membership-badge">
-            🏅 {MOCK_USER.membershipTier} Member
-          </span>
+          <span className="membership-badge">🏅 {MOCK_MEMBERSHIP.currentTier} Member</span>
         </section>
 
         {/* ---------------- Quick actions ---------------- */}
@@ -129,24 +201,35 @@ function ClientDashboard() {
             </div>
           </Link>
 
-          <Link
-            to="/booking-tracking"
-            className={`action-card ${!hasActiveBooking ? "is-disabled" : ""}`}
-            aria-disabled={!hasActiveBooking}
-          >
-            <span className="action-card__icon action-card__icon--outline">
-              📍
-            </span>
-            <div>
-              <h3>Track Active Service</h3>
-              <p>See technician location and live status</p>
+          {hasActiveBooking ? (
+            <Link
+              to={`/booking-tracking?bookingId=${activeBooking.id}`}
+              className="action-card"
+            >
+              <span className="action-card__icon action-card__icon--outline">
+                📍
+              </span>
+              <div>
+                <h3>Track Active Service</h3>
+                <p>See technician location and live status</p>
+              </div>
+            </Link>
+          ) : (
+            <div className="action-card is-disabled" aria-disabled="true">
+              <span className="action-card__icon action-card__icon--outline">
+                📍
+              </span>
+              <div>
+                <h3>Track Active Service</h3>
+                <p>No active booking right now</p>
+              </div>
             </div>
-          </Link>
+          )}
 
           <Link
             to={
               hasRecentServices
-                ? `/checkout?rebook=${MOCK_RECENT_SERVICES[0].id}`
+                ? `/checkout?rebook=${recentServices[0].id}`
                 : "/services"
             }
             className="action-card"
@@ -170,20 +253,32 @@ function ClientDashboard() {
                 <div className="avatar-placeholder" aria-hidden="true" />
                 <div>
                   <p className="technician-name">
-                    {MOCK_ACTIVE_BOOKING.technicianName}
+                    {activeBooking.technician?.name ||
+                      "Finding a technician..."}
                   </p>
                   <p className="technician-role">
-                    {MOCK_ACTIVE_BOOKING.technicianRole}
+                    {activeBooking.service_name}
                   </p>
-                  <p className="technician-eta">{MOCK_ACTIVE_BOOKING.eta}</p>
+                  <p className="technician-eta">
+                    {activeBooking.status === "pending" &&
+                      "Waiting for a technician to accept"}
+                    {activeBooking.status === "accepted" &&
+                      "Technician assigned — getting ready"}
+                    {activeBooking.status === "on_the_way" &&
+                      "Technician is on the way"}
+                    {activeBooking.status === "arrived" &&
+                      "Technician has arrived"}
+                    {activeBooking.status === "in_progress" &&
+                      "Work in progress"}
+                  </p>
                   <p className="technician-vehicle">
-                    🚗 {MOCK_ACTIVE_BOOKING.vehicleNo}
+                    📍 {activeBooking.address}
                   </p>
                 </div>
               </div>
 
               <div className="progress-steps">
-                {MOCK_ACTIVE_BOOKING.steps.map((step, idx) => (
+                {activeBookingSteps.map((step, idx) => (
                   <div
                     key={step.label}
                     className={`progress-step progress-step--${step.status}`}
@@ -193,7 +288,7 @@ function ClientDashboard() {
                     {step.time && (
                       <p className="progress-step__time">{step.time}</p>
                     )}
-                    {idx < MOCK_ACTIVE_BOOKING.steps.length - 1 && (
+                    {idx < activeBookingSteps.length - 1 && (
                       <div className="progress-step__line" />
                     )}
                   </div>
@@ -289,25 +384,31 @@ function ClientDashboard() {
             {hasRecentServices && <Link to="/bookings">View All</Link>}
           </div>
 
-          {hasRecentServices ? (
+          {loadingBookings ? (
+            <p className="empty-text">Loading...</p>
+          ) : hasRecentServices ? (
             <div className="recent-services-grid">
-              {MOCK_RECENT_SERVICES.map((service) => (
+              {recentServices.map((service) => (
                 <div key={service.id} className="card recent-service-card">
                   <div
                     className="image-placeholder image-placeholder--sm"
                     aria-hidden="true"
                   />
-                  <p className="recent-service-card__name">{service.name}</p>
-                  <p className="recent-service-card__meta">{service.date}</p>
+                  <p className="recent-service-card__name">
+                    {service.service_name}
+                  </p>
                   <p className="recent-service-card__meta">
-                    {service.technician}
+                    {new Date(service.created_at).toLocaleDateString()}
+                  </p>
+                  <p className="recent-service-card__meta">
+                    {service.technician?.name || "—"}
                   </p>
                   <span
                     className={`status-badge status-badge--${
-                      service.status === "Completed" ? "success" : "muted"
+                      service.status === "completed" ? "success" : "muted"
                     }`}
                   >
-                    {service.status}
+                    {service.status === "completed" ? "Completed" : "Cancelled"}
                   </span>
                   <Link to="/services" className="btn btn--outline-sm">
                     Book Again
@@ -369,27 +470,87 @@ function ClientDashboard() {
 
           <div className="card addresses">
             <h2>Saved Addresses</h2>
-            {MOCK_ADDRESSES.map((addr) => (
+            {addresses.length === 0 && !showAddForm && (
+              <p className="empty-text">No saved addresses yet.</p>
+            )}
+            {addresses.map((addr) => (
               <div key={addr.id} className="address-chip">
                 <span className="address-chip__icon">
                   {addr.label === "Home" ? "🏠" : "🏢"}
                 </span>
                 <div>
-                  <p className="address-chip__label">{addr.label}</p>
+                  <p className="address-chip__label">
+                    {addr.label}
+                    {addr.is_default && (
+                      <span className="address-chip__default"> · Default</span>
+                    )}
+                  </p>
                   <p className="address-chip__detail">{addr.detail}</p>
                 </div>
+                {!addr.is_default && (
+                  <button
+                    type="button"
+                    className="address-chip__more"
+                    onClick={() => handleMakeDefault(addr.id)}
+                  >
+                    Set default
+                  </button>
+                )}
                 <button
                   type="button"
                   className="address-chip__more"
-                  aria-label="More options"
+                  aria-label="Delete address"
+                  onClick={() => handleDeleteAddress(addr.id)}
                 >
-                  ⋯
+                  ✕
                 </button>
               </div>
             ))}
-            <button type="button" className="add-address-btn">
-              + Add New Address
-            </button>
+
+            {showAddForm ? (
+              <form className="add-address-form" onSubmit={handleAddAddress}>
+                <input
+                  type="text"
+                  placeholder="Label (e.g. Home, Office)"
+                  value={newAddress.label}
+                  onChange={(e) =>
+                    setNewAddress((prev) => ({ ...prev, label: e.target.value }))
+                  }
+                />
+                <input
+                  type="text"
+                  placeholder="Full address"
+                  value={newAddress.detail}
+                  onChange={(e) =>
+                    setNewAddress((prev) => ({ ...prev, detail: e.target.value }))
+                  }
+                />
+                <div className="add-address-form__actions">
+                  <button
+                    type="submit"
+                    className="btn btn--primary btn--sm"
+                    disabled={addingAddress}
+                  >
+                    {addingAddress ? "Saving..." : "Save Address"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--outline btn--sm"
+                    onClick={() => setShowAddForm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="add-address-btn"
+                onClick={() => setShowAddForm(true)}
+              >
+                + Add New Address
+              </button>
+            )}
           </div>
         </section>
 

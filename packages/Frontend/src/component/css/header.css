@@ -27,13 +27,19 @@
   margin-right: auto;
 }
 
-.logo-placeholder {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--df-radius-sm);
-  background: var(--df-orange-tint);
-  border: 1.5px dashed var(--df-orange);
+.site-header__logo-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  display: block;
   flex-shrink: 0;
+}
+
+/* Marketing header: logo left, nav centered, actions right.
+   (App/technician variants keep the original grouped-right layout
+   via the margin-right:auto above — only marketing needed the fix.) */
+.site-header--marketing .site-header__logo {
+  margin-right: 0;
 }
 
 .site-header__wordmark {
@@ -47,7 +53,9 @@
 .site-header__nav {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 28px;
+  flex: 1;
 }
 
 .site-header__link {

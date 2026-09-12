@@ -1,8 +1,8 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../../component/jsx/header.jsx";
 import Footer from "../../component/jsx/footer.jsx";
 import "../css/home.css";
-import AddPopup from "../../component/jsx/ad_popup.jsx";
 
 import heroImg from "../../assets/hero-image.png";
 import electricImg from "../../assets/electricImg.png";
@@ -38,16 +38,86 @@ const STATS = [
 ];
 
 const SERVICE_CATEGORIES = [
-  { icon: Zap, name: "Electric" },
-  { icon: Droplet, name: "Plumbing" },
-  { icon: Snowflake, name: "AC Repair" },
-  { icon: Hammer, name: "Carpentry" },
-  { icon: Paintbrush, name: "Painting" },
-  { icon: Sparkles, name: "Cleaning" },
-  { icon: Bug, name: "Pest Control" },
-  { icon: Wrench, name: "Appliance Repair" },
-  { icon: Sprout, name: "Gardening" },
-  { icon: Camera, name: "CCTV" },
+  {
+    icon: Zap,
+    name: "Electric",
+    slug: "electric",
+    image: electricImg,
+    description:
+      "From fixing faulty wiring to installing new fixtures, our certified electricians ensure your home is safe and powered.",
+  },
+  {
+    icon: Droplet,
+    name: "Plumbing",
+    slug: "plumbing",
+    image: electricImg,
+    description:
+      "Leaky taps, blocked drains, or a full pipe fitting — our plumbers handle it all quickly and cleanly.",
+  },
+  {
+    icon: Snowflake,
+    name: "AC Repair",
+    slug: "ac-repair",
+    image: electricImg,
+    description:
+      "General service, gas refill, or a fresh installation — keep your AC running cool all year round.",
+  },
+  {
+    icon: Hammer,
+    name: "Carpentry",
+    slug: "carpentry",
+    image: electricImg,
+    description:
+      "Doors, wardrobes, shelves, and furniture repair — skilled carpenters for every wood-work need.",
+  },
+  {
+    icon: Paintbrush,
+    name: "Painting",
+    slug: "painting",
+    image: electricImg,
+    description:
+      "Single wall touch-ups to full home repainting, done neatly with premium, damp-resistant paint.",
+  },
+  {
+    icon: Sparkles,
+    name: "Cleaning",
+    slug: "cleaning",
+    image: electricImg,
+    description:
+      "Deep home cleaning, sofa and carpet care, or a spotless kitchen — book a professional cleaning crew.",
+  },
+  {
+    icon: Bug,
+    name: "Pest Control",
+    slug: "pest-control",
+    image: electricImg,
+    description:
+      "Safe, effective treatment against cockroaches, termites, and other household pests.",
+  },
+  {
+    icon: Wrench,
+    name: "Appliance Repair",
+    slug: "appliance-repair",
+    image: electricImg,
+    description:
+      "Fridge, washing machine, microwave — trained technicians to diagnose and fix your appliances.",
+  },
+  {
+    icon: Sprout,
+    name: "Gardening",
+    slug: "gardening",
+    image: electricImg,
+    description:
+      "Lawn care, plant maintenance, and garden clean-ups to keep your outdoor space looking its best.",
+  },
+  {
+    icon: Camera,
+    name: "CCTV",
+    slug: "cctv",
+    image: electricImg,
+    description:
+      "Professional CCTV installation and setup to keep your home or shop secure around the clock.",
+  },
 ];
 
 const PROCESS_STEPS = [
@@ -144,8 +214,12 @@ const TRUST_BADGES = [
 /* ---------------------------------------------------------------------- */
 
 function Home() {
+  const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(
+    SERVICE_CATEGORIES[0]
+  );
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => {
@@ -180,7 +254,11 @@ function Home() {
 
             <form
               className="hero__search"
-              onSubmit={(e) => e.preventDefault()}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = searchValue.trim();
+                navigate(q ? `/services?search=${encodeURIComponent(q)}` : "/services");
+              }}
               role="search"
             >
               <input
@@ -229,9 +307,6 @@ function Home() {
         </div>
       </section>
 
-      {/* Ad popup section*/}
-      <AddPopup />
-
       {/* ================= SERVICE CATEGORIES ================= */}
       <section className="categories" id="categories">
         <div className="section-inner">
@@ -241,11 +316,15 @@ function Home() {
             {SERVICE_CATEGORIES.map((cat) => {
               const Icon = cat.icon;
 
+              const isActive = selectedCategory.slug === cat.slug;
+
               return (
                 <button
                   key={cat.name}
-                  className="category-circle"
+                  className={`category-circle ${isActive ? "is-active" : ""}`}
                   type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setSelectedCategory(cat)}
                 >
                   <span className="category-circle__icon">
                     <Icon />
@@ -259,19 +338,19 @@ function Home() {
 
           <div className="category-preview">
             <div className="category-preview__text">
-              <h3>Electric Services</h3>
-              <p>
-                From fixing faulty wiring to installing new fixtures, our
-                certified electricians ensure your home is safe and powered.
-              </p>
-              <a href="/services/electric" className="link-arrow">
-                Explore Electric Services →
+              <h3>{selectedCategory.name} Services</h3>
+              <p>{selectedCategory.description}</p>
+              <a
+                href={`/services/${selectedCategory.slug}`}
+                className="link-arrow"
+              >
+                Explore {selectedCategory.name} Services →
               </a>
             </div>
             <div className="category-preview__image">
               <img
-                src={electricImg}
-                alt="Electrician fixing electrical panel"
+                src={selectedCategory.image}
+                alt={`${selectedCategory.name} service illustration`}
                 className="category-preview__img"
               />
             </div>
@@ -416,12 +495,17 @@ function Home() {
               transparent payments, and dedicated support.
             </p>
           </div>
-          <a
-            href="/signup?type=provider"
-            className="btn btn--primary provider-cta__btn"
-          >
-            Register as Provider
-          </a>
+          <div className="provider-cta__actions">
+            <a
+              href="/signup?type=provider"
+              className="btn btn--primary provider-cta__btn"
+            >
+              Register as Provider
+            </a>
+            <Link to="/technician/login" className="provider-cta__login-link">
+              Already a provider? Login
+            </Link>
+          </div>
         </div>
       </section>
 
